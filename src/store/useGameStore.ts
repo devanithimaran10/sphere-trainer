@@ -14,7 +14,7 @@ const EMPTY_METRICS: SessionMetrics = {
 };
 
 const INIT_ADAPTIVE: AdaptiveParams = {
-  objectSpeed: 1.0, targetSize: 1.0, cognitiveLoad: 0.5, spawnDelay: 1600,
+  objectSpeed: 0.75, targetSize: 1.15, cognitiveLoad: 0.4, spawnDelay: 2200,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────

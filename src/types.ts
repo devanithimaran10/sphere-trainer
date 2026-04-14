@@ -3,7 +3,11 @@ export type GameMode =
   | 'rule-switch'
   | 'inhibition-conflict'
   | 'micro-trajectory'
-  | 'dual-task';
+  | 'dual-task'
+  | 'neural-grid'
+  | 'signal-trace'
+  | 'reflex-gate'
+  | 'cognitive-stack';
 
 export type SphereColor = 'green' | 'blue' | 'red' | 'yellow';
 export type SphereAction = 'left' | 'right' | 'inhibit' | 'hold';

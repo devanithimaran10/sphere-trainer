@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
-import { Float, MeshDistortMaterial } from '@react-three/drei';
+import { Float, MeshDistortMaterial, Text, Billboard } from '@react-three/drei';
 import * as THREE from 'three';
 import { useGameStore } from '../store/useGameStore';
 import type { ActiveSphere } from '../types';
@@ -24,8 +24,10 @@ export default function Sphere({ sphere }: Props) {
   const holdTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inhibitTimer= useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { registerInput, registerInhibition, adaptive } = useGameStore();
+  const { registerInput, registerInhibition, adaptive, rules } = useGameStore();
   const col = HEX[sphere.color];
+  const HINT: Record<string, string> = { left: '←', right: '→', hold: '⏸', inhibit: '✕' };
+  const hint = HINT[rules[sphere.color]];
 
   // Red spheres: auto-register inhibition after timeout
   useEffect(() => {
@@ -176,6 +178,21 @@ export default function Sphere({ sphere }: Props) {
             <meshBasicMaterial color="#ff2d55" transparent opacity={0.55} />
           </mesh>
         )}
+
+        {/* Action hint — always faces camera */}
+        <Billboard>
+          <Text
+            position={[0, 0, 0.7]}
+            fontSize={0.26}
+            color={col}
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.03}
+            outlineColor="#000000"
+          >
+            {hint}
+          </Text>
+        </Billboard>
       </group>
     </Float>
   );

@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../store/useGameStore';
+import { useMiniGameStore } from '../store/useMiniGameStore';
+import NeuralGrid     from './games/NeuralGrid';
+import SignalTrace    from './games/SignalTrace';
+import RefexGate     from './games/RefexGate';
+import CognitiveStack from './games/CognitiveStack';
 import type { GameMode, SphereColor, SphereAction } from '../types';
 
 // ─── Mode metadata ────────────────────────────────────────────
@@ -32,6 +37,26 @@ const MODES: {
     id: 'dual-task', label: 'Dual-Task', sub: 'Coupling Challenge',
     icon: '⊗', difficulty: 5, color: '#ffd60a',
     desc: 'Rule-switching simultaneous with spatial tracking. Maximum cognitive-motor load.',
+  },
+  {
+    id: 'neural-grid', label: 'Neural Grid', sub: 'Pattern Memory',
+    icon: '⊞', difficulty: 3, color: '#00d4ff',
+    desc: 'Watch tiles light up in sequence, then tap them in the same order. Tests spatial memory.',
+  },
+  {
+    id: 'signal-trace', label: 'Signal Trace', sub: 'Node Sequencing',
+    icon: '⟡', difficulty: 2, color: '#00ff88',
+    desc: 'Click the numbered nodes along the path in order before time runs out. Tests precision.',
+  },
+  {
+    id: 'reflex-gate', label: 'Reflex Gate', sub: 'Portal Timing',
+    icon: '◉', difficulty: 4, color: '#ff2d55',
+    desc: 'Four portals open and close. Hit the target portal exactly when it opens. Tests reflexes.',
+  },
+  {
+    id: 'cognitive-stack', label: 'Cogni Stack', sub: 'Card Memory',
+    icon: '⧉', difficulty: 3, color: '#ffd60a',
+    desc: 'Flip cards to find matching symbol pairs before the timer runs out. Tests working memory.',
   },
 ];
 
@@ -247,6 +272,30 @@ function MenuScreen() {
         </div>
       </div>
 
+      {/* Mini Games section */}
+      <div className="w-full max-w-2xl mt-2 mb-6 animate-fade-up" style={{ opacity: 0, animationDelay: '0.65s' }}>
+        <p className="text-[9px] uppercase tracking-[0.3em] text-slate-600 mb-3 font-display text-center">
+          ── Mini Games ──
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          {MODES.slice(5).map((m) => (
+            <div
+              key={m.id}
+              className={`glass-card p-4 ${mode === m.id ? 'selected' : ''}`}
+              onClick={() => setMode(m.id)}
+            >
+              <div className="flex items-start justify-between mb-2">
+                <span className="text-xl" style={{ color: m.color }}>{m.icon}</span>
+                <DiffPips n={m.difficulty} color={m.color} />
+              </div>
+              <h3 className="font-display text-sm font-semibold mb-0.5" style={{ color: m.color }}>{m.label}</h3>
+              <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-1.5">{m.sub}</p>
+              <p className="text-xs text-slate-400 leading-relaxed">{m.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Rules + Start */}
       <div className="flex items-start gap-6 w-full max-w-2xl animate-fade-up delay-700" style={{ opacity: 0 }}>
         <div className="glass p-5 flex-1">
@@ -256,7 +305,7 @@ function MenuScreen() {
           <RulesLegend />
         </div>
         <div className="flex flex-col items-center gap-3">
-          <button className="btn-primary" onClick={startSession}>
+          <button className="btn-primary" onClick={() => { useMiniGameStore.getState().resetScore(); startSession(); }}>
             Initialise Session
           </button>
           <p className="text-[9px] text-slate-600 uppercase tracking-widest text-center">
@@ -279,14 +328,56 @@ function PlayingHUD() {
     triggerRuleSwitch,
   } = useGameStore();
 
-  const spawnTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const switchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const spawnTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const switchTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gameReadyRef  = useRef(false);
+  const [countdown, setCountdown] = useState<number | null>(3);
 
   // Session countdown
   useEffect(() => {
     const id = setInterval(() => tick(100), 100);
     return () => clearInterval(id);
   }, [tick]);
+
+  // 3-2-1-GO! countdown before spheres spawn
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    timers.push(setTimeout(() => setCountdown(2), 900));
+    timers.push(setTimeout(() => setCountdown(1), 1800));
+    timers.push(setTimeout(() => setCountdown(0), 2700));
+    timers.push(setTimeout(() => { setCountdown(null); gameReadyRef.current = true; }, 3400));
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
+  // Keyboard controls: ← → arrows + Space
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (useGameStore.getState().phase !== 'playing') return;
+      if (!gameReadyRef.current) return;
+      const { activeSpheres, rules, registerInput } = useGameStore.getState();
+
+      let action: SphereAction | null = null;
+      if (e.key === 'ArrowLeft')  action = 'left';
+      if (e.key === 'ArrowRight') action = 'right';
+      if (e.key === ' ')          action = 'hold';
+      if (!action) return;
+      e.preventDefault();
+
+      const target = activeSpheres.find(
+        (s) => !s.isDistractor && s.color !== 'red' && rules[s.color] === action
+      );
+      if (target) {
+        registerInput({
+          sphereId: target.id,
+          action,
+          reactionTime: Date.now() - target.spawnTime,
+          driftMagnitude: 0,
+        });
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sphere spawn loop
   useEffect(() => {
@@ -300,6 +391,10 @@ function PlayingHUD() {
       'inhibition-conflict':  [0.22, 0.22, 0.38, 0.18],
       'micro-trajectory':     [0.30, 0.30, 0.18, 0.22],
       'dual-task':            [0.25, 0.25, 0.28, 0.22],
+      'neural-grid':          [0.28, 0.28, 0.22, 0.22],
+      'signal-trace':         [0.28, 0.28, 0.22, 0.22],
+      'reflex-gate':          [0.28, 0.28, 0.22, 0.22],
+      'cognitive-stack':      [0.28, 0.28, 0.22, 0.22],
     };
 
     const pickColor = (): SphereColor => {
@@ -316,6 +411,7 @@ function PlayingHUD() {
 
     const spawn = () => {
       if (useGameStore.getState().phase !== 'playing') return;
+      if (!gameReadyRef.current) { spawnTimer.current = setTimeout(spawn, 300); return; }
       const isConflict = mode === 'inhibition-conflict';
       const count = isConflict ? Math.floor(Math.random() * 2) + 2 : 1;
 
@@ -480,6 +576,24 @@ function PlayingHUD() {
         </div>
       </div>
 
+      {/* ── Countdown overlay ── */}
+      {countdown !== null && (
+        <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
+          <span
+            key={countdown}
+            className="font-display font-black animate-fade-up"
+            style={{
+              fontSize: countdown === 0 ? '5rem' : '8rem',
+              color: countdown === 0 ? '#00ff88' : '#00d4ff',
+              textShadow: '0 0 40px currentColor, 0 0 80px currentColor',
+              letterSpacing: '0.05em',
+            }}
+          >
+            {countdown === 0 ? 'GO!' : countdown}
+          </span>
+        </div>
+      )}
+
       {/* ── Rule-switch alert (top-center) ── */}
       {ruleSwitchAlert && (
         <div
@@ -507,8 +621,43 @@ function PlayingHUD() {
 // ═══════════════════════════════════════════════════════════════
 // RESULTS SCREEN
 // ═══════════════════════════════════════════════════════════════
+const MINI_GAME_MODES = new Set(['neural-grid', 'signal-trace', 'reflex-gate', 'cognitive-stack']);
+
 function ResultsScreen() {
   const { score, metrics, mode, setMode, startSession } = useGameStore();
+  const miniScore  = useMiniGameStore((s) => s.score);
+  const isMiniGame = MINI_GAME_MODES.has(mode);
+
+  if (isMiniGame) {
+    const modeMeta = MODES.find(m => m.id === mode)!;
+    return (
+      <div className="absolute inset-0 z-10 flex items-center justify-center p-6">
+        <div className="glass-panel p-8 w-full max-w-md animate-fade-up text-center">
+          <p className="text-[9px] uppercase tracking-[0.3em] text-slate-500 mb-1 font-display">Session Complete</p>
+          <h2 className="font-display text-xl font-bold text-white uppercase tracking-widest mb-8">{modeMeta.label}</h2>
+          <div className="mb-8">
+            <span className="font-display text-6xl font-black" style={{ color: modeMeta.color, textShadow: `0 0 30px ${modeMeta.color}` }}>
+              {miniScore}
+            </span>
+            <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-2">Final Score</p>
+          </div>
+          <div className="flex gap-3 justify-center">
+            <button className="btn-primary" onClick={() => { useMiniGameStore.getState().resetScore(); startSession(); }}>
+              Play Again
+            </button>
+            <button
+              className="btn-primary"
+              style={{ color: '#94a3b8', borderColor: 'rgba(148,163,184,0.3)', background: 'rgba(148,163,184,0.05)' }}
+              onClick={() => { setMode('micro-reach'); useGameStore.setState({ phase: 'menu', score: null }); }}
+            >
+              Menu
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!score) return null;
 
   const totalR   = metrics.totalReactions;
@@ -603,13 +752,53 @@ function ResultsScreen() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// MINI GAME ROUTER
+// ═══════════════════════════════════════════════════════════════
+function MiniGameRouter() {
+  const mode       = useGameStore((s) => s.mode);
+  const endSession = useGameStore((s) => s.endSession);
+  const miniScore  = useMiniGameStore((s) => s.score);
+
+  return (
+    <>
+      {/* Top bar shared across all mini-games */}
+      <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-5 py-3 pointer-events-none">
+        <div className="glass px-4 py-2.5">
+          <span className="font-display text-xs tracking-widest text-slate-300">
+            {MODES.find(m => m.id === mode)?.icon} {MODES.find(m => m.id === mode)?.label}
+          </span>
+        </div>
+        <div className="glass px-4 py-2.5">
+          <span className="font-mono font-bold text-sm text-slate-200">{miniScore} pts</span>
+        </div>
+        <button
+          className="pointer-events-auto glass px-4 py-2.5 text-slate-400 hover:text-white transition-all text-xs font-display tracking-widest uppercase"
+          onClick={endSession}
+        >
+          ■ Stop
+        </button>
+      </div>
+
+      {mode === 'neural-grid'      && <NeuralGrid />}
+      {mode === 'signal-trace'     && <SignalTrace />}
+      {mode === 'reflex-gate'      && <RefexGate />}
+      {mode === 'cognitive-stack'  && <CognitiveStack />}
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // ROOT HUD ROUTER
 // ═══════════════════════════════════════════════════════════════
 export default function HUD() {
   const phase = useGameStore((s) => s.phase);
+  const mode  = useGameStore((s) => s.mode);
 
   if (phase === 'menu')    return <MenuScreen />;
-  if (phase === 'playing') return <PlayingHUD />;
+  if (phase === 'playing') {
+    if (MINI_GAME_MODES.has(mode)) return <MiniGameRouter />;
+    return <PlayingHUD />;
+  }
   if (phase === 'results') return <ResultsScreen />;
   return null;
 }
