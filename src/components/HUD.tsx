@@ -5,6 +5,7 @@ import NeuralGrid     from './games/NeuralGrid';
 import SignalTrace    from './games/SignalTrace';
 import RefexGate     from './games/RefexGate';
 import CognitiveStack from './games/CognitiveStack';
+import GeometricDraw  from './games/GeometricDraw';
 import type { GameMode, SphereColor, SphereAction } from '../types';
 
 // ─── Mode metadata ────────────────────────────────────────────
@@ -57,6 +58,11 @@ const MODES: {
     id: 'cognitive-stack', label: 'Cogni Stack', sub: 'Card Memory',
     icon: '⧉', difficulty: 3, color: '#ffd60a',
     desc: 'Flip cards to find matching symbol pairs before the timer runs out. Tests working memory.',
+  },
+  {
+    id: 'geometric-draw', label: 'Geometric Draw', sub: 'Kolam Sand Art',
+    icon: '❊', difficulty: 3, color: '#a855f7',
+    desc: 'Trace beautiful traditional geometric patterns and looping sand art. Tests precision drawing.',
   },
 ];
 
@@ -223,7 +229,7 @@ function MenuScreen() {
 
       {/* Mode cards */}
       <div className="grid grid-cols-2 gap-3 w-full max-w-2xl mb-8">
-        {MODES.map((m, i) => (
+        {MODES.slice(0, 4).map((m, i) => (
           <div
             key={m.id}
             className={`glass-card p-5 animate-fade-up delay-${(i + 1) * 100} ${mode === m.id ? 'selected' : ''}`}
@@ -278,7 +284,7 @@ function MenuScreen() {
           ── Mini Games ──
         </p>
         <div className="grid grid-cols-2 gap-3">
-          {MODES.slice(5).map((m) => (
+          {MODES.slice(5, 9).map((m) => (
             <div
               key={m.id}
               className={`glass-card p-4 ${mode === m.id ? 'selected' : ''}`}
@@ -293,6 +299,31 @@ function MenuScreen() {
               <p className="text-xs text-slate-400 leading-relaxed">{m.desc}</p>
             </div>
           ))}
+
+          {/* 5th mini game card spans both columns */}
+          <div
+            className={`glass-card p-5 col-span-2 ${mode === 'geometric-draw' ? 'selected' : ''}`}
+            onClick={() => setMode('geometric-draw')}
+          >
+            {(() => {
+              const m = MODES[9];
+              return (
+                <div className="flex items-center gap-6">
+                  <span className="text-3xl" style={{ color: m.color }}>{m.icon}</span>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-1">
+                      <h3 className="font-display text-sm font-semibold" style={{ color: m.color }}>
+                        {m.label}
+                      </h3>
+                      <DiffPips n={m.difficulty} color={m.color} />
+                    </div>
+                    <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-1">{m.sub}</p>
+                    <p className="text-xs text-slate-400">{m.desc}</p>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
         </div>
       </div>
 
@@ -395,6 +426,7 @@ function PlayingHUD() {
       'signal-trace':         [0.28, 0.28, 0.22, 0.22],
       'reflex-gate':          [0.28, 0.28, 0.22, 0.22],
       'cognitive-stack':      [0.28, 0.28, 0.22, 0.22],
+      'geometric-draw':       [0.28, 0.28, 0.22, 0.22],
     };
 
     const pickColor = (): SphereColor => {
@@ -621,7 +653,7 @@ function PlayingHUD() {
 // ═══════════════════════════════════════════════════════════════
 // RESULTS SCREEN
 // ═══════════════════════════════════════════════════════════════
-const MINI_GAME_MODES = new Set(['neural-grid', 'signal-trace', 'reflex-gate', 'cognitive-stack']);
+const MINI_GAME_MODES = new Set(['neural-grid', 'signal-trace', 'reflex-gate', 'cognitive-stack', 'geometric-draw']);
 
 function ResultsScreen() {
   const { score, metrics, mode, setMode, startSession } = useGameStore();
@@ -783,6 +815,7 @@ function MiniGameRouter() {
       {mode === 'signal-trace'     && <SignalTrace />}
       {mode === 'reflex-gate'      && <RefexGate />}
       {mode === 'cognitive-stack'  && <CognitiveStack />}
+      {mode === 'geometric-draw'   && <GeometricDraw />}
     </>
   );
 }

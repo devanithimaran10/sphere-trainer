@@ -7,7 +7,8 @@ export type GameMode =
   | 'neural-grid'
   | 'signal-trace'
   | 'reflex-gate'
-  | 'cognitive-stack';
+  | 'cognitive-stack'
+  | 'geometric-draw';
 
 export type SphereColor = 'green' | 'blue' | 'red' | 'yellow';
 export type SphereAction = 'left' | 'right' | 'inhibit' | 'hold';
